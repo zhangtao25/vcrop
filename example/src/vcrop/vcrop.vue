@@ -1,13 +1,13 @@
 <template>
   <div class="vcrop">
-    <canvas ref="canvas" width="800" height="600"></canvas>
+    <canvas ref="canvas" width="800" height="600" @mousedown="startMoveImage"></canvas>
     <div class="crop-box"
          :style="{
-         'width':`${w}px`,
-         'height':`${h}px`,
-         'background-color':'#999',
-         'transform':`translateX(${'100px'}) translateY(64.3008px)`
-         }">
+         'width':`${cropWidth}px`,
+         'height':`${cropHeight}px`,
+         'transform':`translateX(${cropOriginX}px) translateY(${cropOriginY}px)`
+         }"
+         @mousedown="startMoveCropBox">
       <span class="cropper-point point-e"
             @mousedown="startChangeCropBox('e')"></span>
       <span class="cropper-point point-n"
@@ -42,32 +42,117 @@
     data() {
       return {
         ctx: null,
-        clientXY:[0,0],
-        isDown:false,
-        w:100,
-        h:100
+        isChangingCropBox:false,
+        isMovingCropBox:false,
+        isMovingImage:false,
+        cropDragDirection:null,
+        cropWidth:100,
+        cropHeight:100,
+        cropOldWidth:0,
+        cropOldHeight:0,
+        cropOriginX:100,
+        cropOriginY:100,
+        cropOldOriginX:100,
+        cropOldOriginY:100,
+        cropStartPointX:0,
+        cropStartPointY:0,
+        cropEndPointX:4,
+        cropEndPointY:4,
+        imageOldOriginX:0,
+        imageOldOriginY:0,
+        imageOriginX:0,
+        imageOriginY:0,
+        canvasWidth:800,
+        canvasHeight:600
       }
     },
     props: ['imgSrc'],
     mounted() {
       this.init();
-      let img = new Image();
+      this.img = new Image();
       let self = this;
-      img.src = this.imgSrc;
-      img.onload = function () {
-        self.ctx.drawImage(img, 0, 0, 570, 310)
+      self.img.crossOrigin = "Anonymous";
+      self.img.src = this.imgSrc;
+      self.img.onload = function () {
+        self.ctx.drawImage(self.img, 0, 0, 570, 310)
       };
+      document.onmousemove = function (event) {
+        self.cropEndPointX = event.clientX;
+        self.cropEndPointY = event.clientY;
+        if (self.isChangingCropBox){
+          let moveOffsetX = self.cropEndPointX - self.cropStartPointX;
+          let moveOffsetY = self.cropEndPointY - self.cropStartPointY;
 
-      document.onmousemove = function (e) {
-        this.clientXY = [e.clientX,e.clientY];
-        if (self.isDown){
-          self.w = e.clientX-self.clientXY[0]
-          self.h = e.clientY-self.clientXY[1]
+          switch(self.cropDragDirection)
+          {
+            case 'ne':
+              self.cropHeight = self.cropOldHeight - moveOffsetY;
+              self.cropOriginY =self.cropOldOriginY+moveOffsetY;
+
+              self.cropWidth = self.cropOldWidth + moveOffsetX;
+              break;
+            case 'nw':
+              self.cropHeight = self.cropOldHeight - moveOffsetY;
+              self.cropOriginY =self.cropOldOriginY+moveOffsetY;
+
+              self.cropWidth = self.cropOldWidth - moveOffsetX;
+              self.cropOriginX =self.cropOldOriginX+moveOffsetX;
+              break;
+            case 'sw':
+              self.cropHeight = self.cropOldHeight + moveOffsetY;
+
+              self.cropWidth = self.cropOldWidth - moveOffsetX;
+              self.cropOriginX =self.cropOldOriginX+moveOffsetX;
+              break;
+            case 'se':
+              self.cropWidth = self.cropOldWidth + moveOffsetX;
+              self.cropHeight = self.cropOldHeight + moveOffsetY;
+              break;
+            case 'e':
+              self.cropWidth = self.cropOldWidth + moveOffsetX;
+              break;
+            case 'n':
+              self.cropHeight = self.cropOldHeight - moveOffsetY;
+              self.cropOriginY =self.cropOldOriginY+moveOffsetY;
+              break;
+            case 'w':
+              self.cropWidth = self.cropOldWidth - moveOffsetX;
+              self.cropOriginX =self.cropOldOriginX+moveOffsetX;
+              break;
+            case 's':
+              self.cropHeight = self.cropOldHeight + moveOffsetY;
+              break;
+            default:
+          }
+        }
+        if (!self.isChangingCropBox&&self.isMovingCropBox){
+          let moveOffsetX = self.cropEndPointX - self.cropStartPointX;
+          let moveOffsetY = self.cropEndPointY - self.cropStartPointY;
+
+          self.cropOriginX = self.cropOldOriginX+moveOffsetX;
+          self.cropOriginY = self.cropOldOriginY+moveOffsetY;
+        }
+        if (self.isMovingImage){
+          let moveOffsetX = self.cropEndPointX - self.cropStartPointX;
+          let moveOffsetY = self.cropEndPointY - self.cropStartPointY;
+
+          self.imageOriginX = self.imageOldOriginX + moveOffsetX;
+          self.imageOriginY = self.imageOldOriginY + moveOffsetY;
+          // console.log()
+          self.ctx.clearRect(0, 0, 800, 600);
+          self.ctx.drawImage(
+              self.img,
+              self.imageOriginX, self.imageOriginY,
+              570,310
+          );
         }
       };
 
       document.onmouseup = function (e) {
-        self.isDown = false
+        self.isChangingCropBox = false;
+        self.isMovingCropBox = false;
+        self.isMovingImage = false;
+        self.cropDragDirection = null;
       }
     },
     methods: {
@@ -76,10 +161,45 @@
           this.ctx = this.$refs.canvas.getContext("2d");
         }
       },
-      startChangeCropBox(){
-        this.isDown = true
-        console.log(event)
-        this.clientXY = [event.clientX,event.clientY]
+      startChangeCropBox(cropDragDirection){
+        // 获取拖拽方向
+        this.cropDragDirection = cropDragDirection;
+        // 改变裁剪框状态
+        this.isChangingCropBox = true;
+        // 记录之前裁剪框宽高
+        this.cropOldWidth = this.cropWidth;
+        this.cropOldHeight = this.cropHeight;
+        // 记录之前裁剪框原点坐标
+        this.cropOldOriginX = this.cropOriginX;
+        this.cropOldOriginY = this.cropOriginY;
+        // 记录拖拽起始点坐标
+        this.cropStartPointX = event.clientX;
+        this.cropStartPointY = event.clientY;
+      },
+      startMoveCropBox(){
+        // 改变裁剪框状态
+        this.isMovingCropBox = true;
+        // 记录之前裁剪框原点坐标
+        this.cropOldOriginX = this.cropOriginX;
+        this.cropOldOriginY = this.cropOriginY;
+        // 记录拖拽起始点坐标
+        this.cropStartPointX = event.clientX;
+        this.cropStartPointY = event.clientY;
+      },
+      startMoveImage(){
+        this.isMovingImage = true;
+        this.imageOldOriginX = this.imageOriginX;
+        this.imageOldOriginY = this.imageOriginY;
+        // 记录拖拽起始点坐标
+        this.cropStartPointX = event.clientX;
+        this.cropStartPointY = event.clientY;
+      },
+      getCropData(){
+        let self = this
+        let imgData = this.ctx.getImageData(
+            self.cropOriginX,self.cropOriginY,
+            self.cropWidth,self.cropHeight);
+        return imgData
       }
     }
   }
@@ -90,6 +210,7 @@
     width: 800px;
     height: 600px;
     position: relative;
+    overflow: hidden;
   }
 
   .vcrop > canvas {
@@ -98,6 +219,8 @@
 
   .vcrop > .crop-box {
     position: absolute;
+    cursor: move;
+    box-shadow: rgba(0,0,0,.5) 0 0 0 2005px;
   }
 
   /*以下是裁剪框的css*/
