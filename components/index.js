@@ -1,4 +1,4 @@
-import Vcrop from './vcrop'
+import Vcrop from './src/vcrop'
 
 const install = function(Vue) {
   Vue.component('Vcrop', Vcrop);

@@ -1,15 +1,12 @@
-const path = require('path')
-const VueLoaderPlugin = require('vue-loader/lib/plugin')
+const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const VueLoaderPlugin = require('vue-loader/lib/plugin');
 
 module.exports = {
-  devtool: 'cheap-module-source-map',
-  entry: './src/index.js',
+  entry: path.join(__dirname, 'src/main.js'),
   output: {
-    path: path.resolve(__dirname, './dist/'),
-    filename: 'index.js',
-    library: 'vcrop',
-    libraryTarget: 'umd',
-    umdNamedDefine: true
+    filename: 'bundle.js',
+    path: path.join(__dirname, 'dist')
   },
   resolve: {
     extensions: ['.js', '.vue'],
@@ -20,13 +17,13 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.js$/,
+        test: /\.m?js$/,
         exclude: /(node_modules|bower_components)/,
         use: {
           loader: 'babel-loader',
           options: {
             presets: ['@babel/preset-env'],
-            plugins: ['@babel/transform-runtime']
+            plugins: ['@babel/plugin-proposal-object-rest-spread']
           }
         }
       },
@@ -43,8 +40,10 @@ module.exports = {
       }
     ]
   },
-  mode: "production",
   plugins: [
+    new HtmlWebpackPlugin({
+      template: './public/index.html'
+    }),
     new VueLoaderPlugin()
   ]
-}
+};
